@@ -1,0 +1,38 @@
+{
+    "Config": {
+        "whetherVerificationCodeIsEnabl": false
+    },
+    "mysql": {
+        "host": "127.0.0.1",
+        "port": 3306,
+        "user": "goedge",
+        "password": "goedge",
+        "database": "goedge"
+    },
+    "EdgeAdmin_mysql": {
+        "host": "",
+        "port": 8001,
+        "user": "",
+        "password": "",
+        "database": ""
+    },
+    "Verification": {
+        "type": 0,
+        "host": "",
+        "port": 465,
+        "ssl": true,
+        "user": "",
+        "password": "",
+        "title": "AMEN-GoEdge-User",
+        "frequentTime": 60
+    },
+    "API": {
+        "HOST": "",
+        "AccessKey ID": "",
+        "AccessKey Key": "",
+        "nodeClusterId": 1
+    },
+    "Token": "",
+    "expiresAt": 0,
+    "adminId": 2
+}
