@@ -1,5 +1,6 @@
 import base64
 import json
+import traceback
 
 from API import Api
 from API import ServerService
@@ -25,6 +26,10 @@ class HTTPWebService(Api):
             Config = ServerConfig[1]
             Config = json.loads(base64.b64decode(Config).decode())
             redirectToHTTPSJson: dict = Config['web']['redirectToHTTPS']
+            if redirectToHTTPSJson is None:
+                status_i = 301
+                isOn = False
+                redirectToHTTPSJson = {"host": "", "port": 0, "isPrior": False, "onlyDomains": None, "exceptDomains": None}
             if status:
                 status_i = 301
             else:

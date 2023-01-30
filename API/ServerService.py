@@ -3,11 +3,28 @@ import json
 import traceback
 
 import Sql
-from API import Api
+from API import Api, ReverseProxyService
 
 
 class ServerService(Api):
     def createServer(self, ClusterId: int, userId: int, name: str, domain: str):
+        id_info = self.createReverseProxy()  # 创建反向代理
+        if not id_info[0]:
+            # 创建失败
+            return [False, id_info[1]]
+        # 创建成功
+        reverse_id = id_info[1]
+        reverse_json = json.dumps(
+            {"isOn": True, "isPrior": False, "reverseProxyId": int(reverse_id)}
+        )
+        reverse_json = base64.b64encode(reverse_json.encode('utf-8')).decode("utf-8")
+        #  创建ssl配置
+        ssl_info = self.createSSLPolicy()
+        if not ssl_info[0]:
+            # 创建失败
+            return [False, ssl_info[1]]
+        ssl_id = ssl_info[1]
+
         #  查询是否存在domain
         # if not self.finddomain(ESql, domain):
         #     return [False, "域名 {} 已经被其他服务所占用，不能重复使用".format(domain)]
@@ -28,7 +45,7 @@ class ServerService(Api):
         https_json = json.dumps(
             {"isOn": False,
              "listen": [{"host": "", "maxPort": 443, "minPort": 443, "protocol": "https", "portRange": "443"}],
-             "sslPolicy": None, "sslPolicyRef": None}
+             "sslPolicy": None, "sslPolicyRef": {"isOn":True,"sslPolicyId":int(ssl_id)}}
         )
         https_json = base64.b64encode(https_json.encode('utf-8')).decode("utf-8")
         submit = {
@@ -43,15 +60,16 @@ class ServerService(Api):
             "description": "AMEN-GoEdge-User创建的网站服务,不可删除,请通过AMEN-GoEdge-User删除,否则AMEN-GoEdge-User异常",
             "serverNamesJON": server_json,
             "httpJSON": http_json,
-            "httpsJSON": https_json
+            "httpsJSON": https_json,
+            "reverseProxyJSON": reverse_json
         }
-
         res = self.post(self.Host + "/ServerService/createServer", json=submit)
         try:
             if res is None:
                 return [False, None]
             if res.json()['code'] != 200:
                 return [False, res.json()['message']]
+            self.findAndInitServerWebConfig(res.json()['data']['serverId'])  # 初始化web
             return [True, res.json()['data']['serverId']]
         except:
             traceback.print_exc()
@@ -185,7 +203,7 @@ class ServerService(Api):
         except:
             return [False, None]
 
-    def updateServerHTTPS(self,serverId:int,isOn:bool):
+    def updateServerHTTPS(self, serverId: int, isOn: bool):
         ServerConfig = self.findEnabledServerConfig(serverId)
         if not ServerConfig[0]:
             if ServerConfig[1] is None:
@@ -204,16 +222,16 @@ class ServerService(Api):
             "serverId": serverId,
             "httpsJSON": httpsJSON_bytes
         }
-        res = self.post(self.Host+"/ServerService/updateServerHTTPS",json=submit)
+        res = self.post(self.Host + "/ServerService/updateServerHTTPS", json=submit)
         try:
             if res.json()['code'] == 200:
-                return [True,"ok"]
+                return [True, "ok"]
             else:
-                return [False,res.json()['message']]
+                return [False, res.json()['message']]
         except:
-            return [False,None]
+            return [False, None]
 
-    def updateServerHTTP(self,serverId:int,isOn:bool):
+    def updateServerHTTP(self, serverId: int, isOn: bool):
         ServerConfig = self.findEnabledServerConfig(serverId)
         if not ServerConfig[0]:
             if ServerConfig[1] is None:
@@ -232,14 +250,66 @@ class ServerService(Api):
             "serverId": serverId,
             "httpJSON": httpsJSON_bytes
         }
-        res = self.post(self.Host+"/ServerService/updateServerHTTP",json=submit)
+        res = self.post(self.Host + "/ServerService/updateServerHTTP", json=submit)
         try:
             if res.json()['code'] == 200:
-                return [True,"ok"]
+                return [True, "ok"]
             else:
-                return [False,res.json()['message']]
+                return [False, res.json()['message']]
         except:
-            return [False,None]
+            return [False, None]
 
+    def findAndInitServerWebConfig(self, serverId: int):
+        #  初始化web设置
+        submit = {
+            "serverId": serverId
+        }
+        res = self.post(self.Host + "/ServerService/findAndInitServerWebConfig", json=submit)
+        try:
+            if res.json()['code'] == 200:
+                return [True, "ok"]
+            else:
+                return [False, res.json()['message']]
+        except:
+            return [False, None]
 
+    def createReverseProxy(self):
+        # 创建反向代理,返回id
+        # submit = {
+        #     "reverseProxyId": reverseProxyId,
+        #     "originsJSON": originsJSON_bytes
+        # }
+        res = self.post(self.Host + "/ReverseProxyService/createReverseProxy")
+        print(res.json())
+        try:
+            if res.json()['code'] == 200:
+                return [True, res.json()['data']['reverseProxyId']]
+            else:
+                return [True, res.json()['message']]
+        except:
+            return [False, None]
 
+    def createSSLPolicy(self):
+        # 创建ssl配置
+        hsts_json = json.dumps(
+            {"isOn": False, "maxAge": 2592000, "domains": [], "preload": False, "includeSubDomains": False}
+        )
+        hsts_json = base64.b64encode(hsts_json.encode('utf-8')).decode("utf-8")
+        submit = {
+            "minVersion": "TLS 1.0",
+            "http2Enabled": False,
+            "hstsJSON": hsts_json,
+            "clientAuthType": 0,
+            "ocspIsOn": False,
+            "cipherSuitesIsOn": False,
+            "clientCACertsJSON": None,
+            "sslCertsJSON": None
+        }
+        res = self.post(self.Host + "/SSLPolicyService/createSSLPolicy", json=submit)
+        try:
+            if res.json()['code'] == 200:
+                return [True, res.json()['data']['sslPolicyId']]
+            else:
+                return [True, res.json()['message']]
+        except:
+            return [False, None]
